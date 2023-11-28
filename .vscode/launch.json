@@ -8,13 +8,30 @@
       "type": "node",
       "request": "launch",
       "name": "Launch Program",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
+      "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/hello-world/utils/client.ts",
-      "outFiles": [
-        "${workspaceFolder}/**/*.js"
-      ]
+      "outFiles": ["${workspaceFolder}/**/*.js"]
+    },
+    {
+      "command": "npm run test",
+      "name": "Test Lambda",
+      "request": "launch",
+      "type": "node-terminal",
+      "cwd": "${workspaceFolder}/hello-world"
+    },
+    {
+      "command": "sam build",
+      "name": "Sam:build",
+      "request": "launch",
+      "type": "node-terminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "command": "sam deploy --guided",
+      "name": "Sam:deploy",
+      "request": "launch",
+      "type": "node-terminal",
+      "cwd": "${workspaceFolder}"
     }
   ]
 }
