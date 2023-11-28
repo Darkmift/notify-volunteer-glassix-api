@@ -6,12 +6,13 @@ export const { GLASSIX_BASIC_AUTH_KEY, GLASSIX_BASIC_AUTH_SECRET, GLASSIX_USERNA
 const env = cleanEnv(
     process.env,
     {
+        GLASSIX_UNIQUE_TOKEN: str(),
         GLASSIX_BASIC_AUTH_KEY: str(),
         GLASSIX_BASIC_AUTH_SECRET: str(),
         GLASSIX_USERNAME: email(),
     },
     {
-        reporter: ({ errors, env }) => {
+        reporter: ({ errors }) => {
             logger.info(`There are errors in the environment variables:`, { errors });
         },
     },
