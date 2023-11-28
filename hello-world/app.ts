@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import logger from './utils/logger-winston';
 
 /**
  *
@@ -13,6 +14,7 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
 export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     try {
+        logger.info('event', event);
         return {
             statusCode: 200,
             body: JSON.stringify({
