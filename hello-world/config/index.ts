@@ -1,6 +1,5 @@
 import { cleanEnv, str, email } from 'envalid';
 import logger from '../utils/logger-winston';
-import { url } from 'inspector';
 
 export const { GLASSIX_BASIC_AUTH_KEY, GLASSIX_BASIC_AUTH_SECRET, GLASSIX_USERNAME } = process.env;
 
