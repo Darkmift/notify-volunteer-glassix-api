@@ -14,10 +14,12 @@ import logger from './utils/logger-winston';
 
 export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     try {
+        const body = event?.body && JSON.parse(event.body);
         logger.info('event', event);
         return {
             statusCode: 200,
             body: JSON.stringify({
+                challenge: body?.challenge,
                 message: 'hello world',
             }),
         };
