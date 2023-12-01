@@ -1,16 +1,14 @@
-import { cleanEnv, str, email } from 'envalid';
+import { cleanEnv, str } from 'envalid';
 import logger from '../utils/logger-winston';
-
-export const { GLASSIX_BASIC_AUTH_KEY, GLASSIX_BASIC_AUTH_SECRET, GLASSIX_USERNAME } = process.env;
 
 const env = cleanEnv(
     process.env,
     {
         GLASSIX_UNIQUE_TOKEN: str(),
-        GLASSIX_BASIC_AUTH_KEY: str(),
-        GLASSIX_BASIC_AUTH_SECRET: str(),
-        GLASSIX_USERNAME: email(),
         GLASSIX_UNIQUE_URL: str(),
+        MONDAY_API_KEY: str(),
+        GLASSIX_FROM_PHONE_NUMBER: str(),
+        GLASSIX_WABA: str(),
     },
     {
         reporter: ({ errors }) => {
