@@ -2,7 +2,7 @@ import { gql } from 'graphql-request';
 
 export const GET_ITEM_DATA = gql`
     query GetItemData($itemId: ID!) {
-        items(ids: $itemId) {
+        items(ids: [$itemId]) {
             id
             name
             group {
