@@ -2,7 +2,7 @@ export interface ContactVolunteerDetails {
     volunteerPhoneNumber: string;
     volunteerName: string;
     seniorName: string;
-    seniorPhoneNumbers: string;
+    seniorPhoneNumber: string;
     subscriptionNumber: string;
     communityLeader: string;
     hoursThreshold: number;
@@ -24,4 +24,30 @@ export type MessageType = {
     level: string;
     message: string;
     timestamp: string;
+};
+
+export interface MondayEvent {
+    app: string;
+    type: string;
+    triggerTime: string;
+    subscriptionId: number;
+    userId: number;
+    originalTriggerUuid: string | null;
+    boardId: number;
+    pulseId: number;
+    sourceGroupId: string;
+    destGroupId: string;
+    destGroup: {
+        id: string;
+        title: string;
+        color: string;
+        is_top_group: boolean;
+    };
+    triggerUuid: string;
+    challenge?: string;
+}
+
+export type MoveHelpRequesterBackToRawListGroupVariables = {
+    helpRequesterId: number;
+    groupId: string;
 };
