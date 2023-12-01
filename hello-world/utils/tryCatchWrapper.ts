@@ -1,12 +1,11 @@
-// a fn that takes a fn and wraps in try/catch
-// returns a fn that will run the passed in fn
-
 import logger from './logger-winston';
 
-export const asyncTryCatchWrapper = async <T>(fn: () => T): Promise<T | undefined> => {
-    try {
-        return await fn();
-    } catch (e) {
-        logger.error(e as Error);
-    }
+export const asyncTryCatchWrapper = <T, Args extends never[]>(fn: (...args: Args) => Promise<T>) => {
+    return async (...args: Args): Promise<T | undefined> => {
+        try {
+            return await fn(...args);
+        } catch (e) {
+            logger.error(e as Error);
+        }
+    };
 };
