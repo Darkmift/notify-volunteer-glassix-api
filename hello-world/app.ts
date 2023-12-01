@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import Lambda from 'aws-sdk/clients/lambda';
+
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import logger from './utils/logger-winston';
 import tryparse from './utils/tryparse';
@@ -12,7 +14,8 @@ import {
     VOLUNTEER_PHONE_COL_ID,
 } from './config/consts';
 import { ICommunityLeaderColValueParsed, ILinkedPulseIds, IPhoneColValueParsed } from './types/monday';
-import { messageVolunteerOnWhatsapp } from './client/glassix';
+// import { messageVolunteerOnWhatsapp } from './client/glassix';
+import env from './config/index';
 
 /**
  *
@@ -23,6 +26,7 @@ import { messageVolunteerOnWhatsapp } from './client/glassix';
  * @returns {Object} object - API Gateway Lambda Proxy Output Format
  *
  */
+const lambda = new Lambda({ region: 'il-central-1' });
 
 export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     const { event: eventBody } = tryparse<{ event: MondayEvent }>(event?.body);
@@ -87,9 +91,14 @@ export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGat
         const seniorPhoneNumber = requestHelperDataPhoneCol?.value?.replace(/"/g, '').replace(/'/g, '') + '';
         logger.log('🚀 ~ file: app.ts:83 ~ lambdaHandler ~ seniorPhoneNumber:', seniorPhoneNumber);
 
+        // we get the name from column values of requester
+        const requestHelperNameColValue = requestHelperData?.items[0].column_values.find(
+            (col) => col.column.id === 'text',
+        );
+
         const messageOptions: ContactVolunteerDetails = {
             volunteerPhoneNumber: volunteerPhoneColParsed?.phone,
-            volunteerName: volunteerData.items[0].name,
+            volunteerName: requestHelperNameColValue?.value + '',
             seniorName: requestHelperData.items[0].name,
             seniorPhoneNumber: seniorPhoneNumber,
             subscriptionNumber: requestHelperData.items[0].name,
@@ -98,13 +107,23 @@ export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGat
                 : 'אין מידע',
             hoursThreshold: 24,
         };
-        logger.log('🚀 ~ file: app.ts:92 ~ lambdaHandler ~ messageOptions:', { messageOptions });
+        // logger.log('🚀 ~ file: app.ts:92 ~ lambdaHandler ~ messageOptions:', { messageOptions });
 
-        const messageSendResult = await messageVolunteerOnWhatsapp(messageOptions);
-        logger.log('🚀 ~ file: app.ts:103 ~ lambdaHandler ~ result:', messageSendResult);
-        if (!messageSendResult?.status?.length) {
-            throw new Error('message sending may have failed');
-        }
+        // const messageSendResult = await messageVolunteerOnWhatsapp(messageOptions);
+
+        // logger.log('🚀 ~ file: app.ts:103 ~ lambdaHandler ~ result:', messageSendResult);
+        // if (!messageSendResult?.status?.length) {
+        //     throw new Error('message sending may have failed');
+        // }
+
+        const lambdaParams = {
+            FunctionName: env.IL_LAMBDA_ARN,
+            InvocationType: 'RequestResponse', // use 'RequestResponse' if you need the response or Event
+            Payload: JSON.stringify(messageOptions),
+        };
+        logger.log('🚀 ~ file: app.ts:119 ~ lambdaHandler ~ lambdaParams:', lambdaParams);
+        const messageSendResult = await lambda.invoke(lambdaParams).promise();
+        logger.log('🚀 ~ Lambda invoke result:', messageSendResult);
 
         return response;
     } catch (err) {

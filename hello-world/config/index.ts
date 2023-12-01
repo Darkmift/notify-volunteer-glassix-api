@@ -9,6 +9,7 @@ const env = cleanEnv(
         MONDAY_API_KEY: str(),
         GLASSIX_FROM_PHONE_NUMBER: str(),
         GLASSIX_WABA: str(),
+        IL_LAMBDA_ARN: str(),
     },
     {
         reporter: ({ errors }) => {
