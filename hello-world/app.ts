@@ -13,9 +13,86 @@ import {
     LINKED_VOLUNTEERS_COLUMN_ID,
     VOLUNTEER_PHONE_COL_ID,
 } from './config/consts';
-import { ICommunityLeaderColValueParsed, ILinkedPulseIds, IPhoneColValueParsed } from './types/monday';
-// import { messageVolunteerOnWhatsapp } from './client/glassix';
+import { ICommunityLeaderColValueParsed, ILinkedPulseIds, IPhoneColValueParsed, ItemElement } from './types/monday';
 import env from './config/index';
+
+async function getRequestHelperData(id: number): Promise<ItemElement> {
+    logger.info('Get request helper data for id', { id });
+    const requestHelperData = await getItemData(id, 'requester');
+    logger.debug('Helper data is:', requestHelperData);
+    return requestHelperData?.items[0];
+}
+
+async function getVolunteerData(requestHelperData: ItemElement): Promise<ItemElement> {
+    const linkedVolunteersColData = requestHelperData.column_values?.find(
+        (col) => col.column.id === LINKED_VOLUNTEERS_COLUMN_ID,
+    );
+
+    const linkedVolunteersParsed = tryparse<ILinkedPulseIds>(linkedVolunteersColData?.value);
+
+    if (!linkedVolunteersParsed?.linkedPulseIds) {
+        logger.error('no linked volunteers data', { requestHelperData });
+        throw new Error('no linked volunteers data');
+    }
+
+    const volunteerId = linkedVolunteersParsed?.linkedPulseIds[0]?.linkedPulseId;
+
+    if (!volunteerId) {
+        logger.error('no assigned volunteers', { requestHelperData });
+        throw new Error('no assigned volunteers');
+    }
+
+    const volunteerData = await getItemData(volunteerId, 'volunteer');
+    if (!volunteerData.items) {
+        logger.error('Volunteer data not found for id:', { volunteerId });
+    }
+
+    return volunteerData.items[0];
+}
+
+async function sendNotification(requestHelper: ItemElement, volunteer: ItemElement) {
+    const glassixMessageOptions = constructGlassixMessageOptions(requestHelper, volunteer);
+    const lambdaParams = {
+        FunctionName: env.IL_LAMBDA_ARN,
+        InvocationType: 'RequestResponse', // use 'RequestResponse' if you need the response or Event
+        Payload: JSON.stringify(glassixMessageOptions),
+    };
+    logger.info('Involing Glassix lambda');
+    return await lambda.invoke(lambdaParams).promise();
+}
+
+function constructGlassixMessageOptions(requestHelper: ItemElement, volunteer: ItemElement) {
+    const volunteerPhoneCol = volunteer.column_values?.find((col) => col.column.id === VOLUNTEER_PHONE_COL_ID);
+    const requestHelperDataPhoneCol = requestHelper.column_values?.find((col) => col.column.id === HELPER_PHONE_COL_ID);
+    const requestHelperDataCommunityCol = requestHelper.column_values?.find(
+        (col) => col.column.id === HELPER_COMMUNITY_LEADER_COL_ID,
+    );
+
+    const requestHelperDataCommunityColParsed = tryparse<ICommunityLeaderColValueParsed>(
+        requestHelperDataCommunityCol?.value,
+    );
+
+    const volunteerPhoneColParsed = tryparse<IPhoneColValueParsed>(volunteerPhoneCol?.value);
+    const seniorPhoneNumber = requestHelperDataPhoneCol?.value?.replace(/"/g, '').replace(/'/g, '') + '';
+    logger.info('Help request phone number is', { seniorPhoneNumber });
+
+    // we get the name from column values of requester
+    const requestHelperNameColValue = requestHelper.column_values.find((col) => col.column.id === 'text');
+
+    const messageOptions: ContactVolunteerDetails = {
+        volunteerPhoneNumber: volunteerPhoneColParsed?.phone,
+        volunteerName: requestHelperNameColValue?.value + '',
+        seniorName: requestHelper.name,
+        seniorPhoneNumber: seniorPhoneNumber,
+        subscriptionNumber: requestHelper.name,
+        communityLeader: requestHelperDataCommunityColParsed?.post_id
+            ? requestHelperDataCommunityColParsed?.post_id
+            : 'אין מידע',
+        hoursThreshold: 24,
+    };
+    logger.debug('Message options for Glassix are', messageOptions);
+    return messageOptions;
+}
 
 /**
  *
@@ -38,93 +115,12 @@ export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGat
         message: 'app init',
     };
     const response = { statusCode: 200, body: JSON.stringify(responseBody) };
-    let requestHelperId = -1;
+    const requestHelperId = eventBody.pulseId;
     try {
-        /**
-         * we get the request helper data
-         */
-        const requestHelperData = await getItemData(eventBody.pulseId, 'requester');
-        logger.log('🚀 ~ file: app.ts:33 ~ lambdaHandler ~ requestHelperData:', requestHelperData);
-
-        // if an error is thrown in process we use in catch to return requester to raw group
-        requestHelperId = parseInt(requestHelperData?.items[0]?.id);
-
-        const linkedVolunteersColData = requestHelperData?.items[0]?.column_values?.find(
-            (col) => col.column.id === LINKED_VOLUNTEERS_COLUMN_ID,
-        );
-
-        const linkedVolunteersParsed = tryparse<ILinkedPulseIds>(linkedVolunteersColData?.value);
-
-        if (!linkedVolunteersParsed?.linkedPulseIds) {
-            logger.warn('no linked volunteers data', { requestHelperData });
-            throw new Error('no linked volunteers data');
-        }
-
-        const volunteerId = linkedVolunteersParsed?.linkedPulseIds[0]?.linkedPulseId;
-
-        if (!volunteerId) {
-            logger.warn('no assigned volunteers', { requestHelperData });
-            throw new Error('no assigned volunteers');
-        }
-
-        const volunteerData = await getItemData(volunteerId, 'volunteer');
-        logger.log('🚀 ~ file: app.ts:60 ~ lambdaHandler ~ volunteerData:', volunteerData);
-        const volunteerPhoneCol = volunteerData?.items[0]?.column_values?.find(
-            (col) => col.column.id === VOLUNTEER_PHONE_COL_ID,
-        );
-        const requestHelperDataPhoneCol = requestHelperData?.items[0]?.column_values?.find(
-            (col) => col.column.id === HELPER_PHONE_COL_ID,
-        );
-        const requestHelperDataCommunityCol = requestHelperData?.items[0]?.column_values?.find(
-            (col) => col.column.id === HELPER_COMMUNITY_LEADER_COL_ID,
-        );
-
-        const requestHelperDataCommunityColParsed = tryparse<ICommunityLeaderColValueParsed>(
-            requestHelperDataCommunityCol?.value,
-        );
-
-        logger.log('🚀 ~ file: app.ts:79 ~ lambdaHandler ~ requestHelperDataCommunityColParsed:', {
-            requestHelperDataCommunityColParsed,
-        });
-
-        const volunteerPhoneColParsed = tryparse<IPhoneColValueParsed>(volunteerPhoneCol?.value);
-        const seniorPhoneNumber = requestHelperDataPhoneCol?.value?.replace(/"/g, '').replace(/'/g, '') + '';
-        logger.log('🚀 ~ file: app.ts:83 ~ lambdaHandler ~ seniorPhoneNumber:', seniorPhoneNumber);
-
-        // we get the name from column values of requester
-        const requestHelperNameColValue = requestHelperData?.items[0].column_values.find(
-            (col) => col.column.id === 'text',
-        );
-
-        const messageOptions: ContactVolunteerDetails = {
-            volunteerPhoneNumber: volunteerPhoneColParsed?.phone,
-            volunteerName: requestHelperNameColValue?.value + '',
-            seniorName: requestHelperData.items[0].name,
-            seniorPhoneNumber: seniorPhoneNumber,
-            subscriptionNumber: requestHelperData.items[0].name,
-            communityLeader: requestHelperDataCommunityColParsed?.post_id
-                ? requestHelperDataCommunityColParsed?.post_id
-                : 'אין מידע',
-            hoursThreshold: 24,
-        };
-        // logger.log('🚀 ~ file: app.ts:92 ~ lambdaHandler ~ messageOptions:', { messageOptions });
-
-        // const messageSendResult = await messageVolunteerOnWhatsapp(messageOptions);
-
-        // logger.log('🚀 ~ file: app.ts:103 ~ lambdaHandler ~ result:', messageSendResult);
-        // if (!messageSendResult?.status?.length) {
-        //     throw new Error('message sending may have failed');
-        // }
-
-        const lambdaParams = {
-            FunctionName: env.IL_LAMBDA_ARN,
-            InvocationType: 'RequestResponse', // use 'RequestResponse' if you need the response or Event
-            Payload: JSON.stringify(messageOptions),
-        };
-        logger.log('🚀 ~ file: app.ts:119 ~ lambdaHandler ~ lambdaParams:', lambdaParams);
-        const messageSendResult = await lambda.invoke(lambdaParams).promise();
-        logger.log('🚀 ~ Lambda invoke result:', messageSendResult);
-
+        const requestHelperData = await getRequestHelperData(requestHelperId);
+        const volunteerData = await getVolunteerData(requestHelperData);
+        const notificationSendingResult = await sendNotification(requestHelperData, volunteerData);
+        logger.debug('Notification sending result', notificationSendingResult);
         return response;
     } catch (err) {
         const error = err as Error;
